@@ -8,8 +8,18 @@ set -e
 
 echo "🚀 [1/6] Updating system and installing dependencies..."
 sudo apt-get update -y
-sudo apt-get upgrade -y
 sudo apt-get install -y curl git nginx build-essential
+
+# Configure 2GB Swap Memory to prevent Out-Of-Memory (OOM) crashes on 1GB RAM EC2 (t2.micro / t3.micro)
+if ! swapon --show | grep -q '/swapfile'; then
+    echo "💾 Setting up 2GB Swap memory to ensure smooth build on EC2..."
+    sudo fallocate -l 2G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
+    sudo chmod 600 /swapfile
+    sudo mkswap /swapfile
+    sudo swapon /swapfile
+    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+    echo "✅ Swap memory enabled."
+fi
 
 # Install Node.js 20.x
 if ! command -v node &> /dev/null; then
@@ -30,6 +40,9 @@ echo "✅ PM2 version: $(pm2 -v)"
 
 PROJECT_DIR=$(pwd)
 
+# Ensure Nginx (www-data) can traverse the parent directory to serve client dist
+chmod o+x "$HOME" || true
+
 # Setup Backend Server
 echo "🚀 [2/6] Setting up Backend Server..."
 cd "$PROJECT_DIR/server"
@@ -37,10 +50,11 @@ cd "$PROJECT_DIR/server"
 if [ ! -f .env ]; then
     echo "⚠️ .env file not found. Copying from .env.example..."
     cp .env.example .env
-    echo "❗ IMPORTANT: Edit server/.env with your MongoDB Atlas URI, JWT Secret, and AWS S3 credentials!"
+    echo "❗ IMPORTANT: Edit server/.env with your MongoDB Atlas URI, JWT Secret, and Groq/AWS credentials if needed!"
 fi
 
-npm ci --production
+echo "📦 Installing backend dependencies..."
+npm ci --production || npm install --omit=dev
 
 # Start / Restart with PM2
 echo "🚀 [3/6] Starting Backend with PM2..."
@@ -51,7 +65,7 @@ sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u $USER --hp $HOME || true
 # Setup Frontend Client
 echo "🚀 [4/6] Building Frontend React Client..."
 cd "$PROJECT_DIR/client"
-npm ci
+npm ci || npm install
 npm run build
 
 # Configure Nginx Reverse Proxy
