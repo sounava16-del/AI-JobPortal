@@ -25,7 +25,7 @@ const Footer = () => {
               <Server className="w-3 h-3 text-indigo-500" /> Node + Express
             </span>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-              <Sparkles className="w-3 h-3 text-amber-500" /> Groq & OpenAI
+              <Sparkles className="w-3 h-3 text-amber-500" /> Groq LPU AI Engine
             </span>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
               <Cloud className="w-3 h-3 text-sky-500" /> AWS EC2 & S3

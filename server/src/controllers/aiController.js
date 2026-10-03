@@ -44,29 +44,34 @@ const careerCoachChat = async (req, res, next) => {
   try {
     const { message, history } = req.body;
 
-    if (!message) {
+    if (!message || typeof message !== 'string' || !message.trim()) {
       return res.status(400).json({ success: false, message: 'Message is required' });
     }
 
     const user = await User.findById(req.user.id);
     const result = await careerChat(
       req.user.id,
-      message,
-      history || [],
+      message.trim(),
+      Array.isArray(history) ? history : [],
       {
-        skills: user.skills,
-        experienceYears: user.experienceYears,
-        headline: user.headline
+        skills: user?.skills || [],
+        experienceYears: user?.experienceYears || 0,
+        headline: user?.headline || ''
       }
     );
 
     res.status(200).json({
       success: true,
       reply: result.reply,
-      provider: result.provider
+      provider: result.provider,
+      model: result.model
     });
   } catch (err) {
-    next(err);
+    console.error('Career Coach Chat Error:', err.message);
+    res.status(500).json({
+      success: false,
+      message: err.message || 'Failed to generate career advice from AI provider.'
+    });
   }
 };
 

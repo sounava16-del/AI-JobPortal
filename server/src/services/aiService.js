@@ -9,39 +9,58 @@ const { SKILL_KEYWORDS } = require('./resumeParser');
 const callLLM = async ({ systemPrompt, userPrompt, temperature = 0.3, maxTokens = 1500 }) => {
   const config = getAIConfig();
   if (!config.isConfigured) {
-    throw new Error('No AI provider configured');
+    throw new Error('No AI provider configured. Please set GROQ_API_KEY in the environment variables.');
   }
 
-  const endpoint = `${config.baseURL}/chat/completions`;
-  const response = await axios.post(
-    endpoint,
-    {
-      model: config.model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature,
-      max_tokens: maxTokens,
-      response_format: { type: 'json_object' }
-    },
-    {
-      headers: {
-        'Authorization': `Bearer ${config.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      timeout: 25000
-    }
-  );
+  const candidateModels = [
+    config.model,
+    'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
+    'qwen/qwen3.8-27b'
+  ].filter((v, i, a) => v && a.indexOf(v) === i);
 
-  const usage = response.data.usage || {};
-  return {
-    content: response.data.choices[0].message.content,
-    promptTokens: usage.prompt_tokens || 0,
-    completionTokens: usage.completion_tokens || 0,
-    provider: config.provider,
-    model: config.model
-  };
+  let lastError = null;
+  for (const modelToTry of candidateModels) {
+    try {
+      const endpoint = `${config.baseURL}/chat/completions`;
+      const response = await axios.post(
+        endpoint,
+        {
+          model: modelToTry,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature,
+          max_tokens: maxTokens,
+          response_format: { type: 'json_object' }
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${config.apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 25000
+        }
+      );
+
+      const usage = response.data.usage || {};
+      return {
+        content: response.data.choices[0].message.content,
+        promptTokens: usage.prompt_tokens || 0,
+        completionTokens: usage.completion_tokens || 0,
+        provider: config.provider,
+        model: modelToTry
+      };
+    } catch (err) {
+      lastError = err;
+      if (err.response?.status === 401) {
+        throw new Error('Invalid AI API key. Please check your GROQ_API_KEY.');
+      }
+    }
+  }
+
+  throw lastError;
 };
 
 /**
@@ -139,6 +158,12 @@ ${resumeText.substring(0, 3000)}`;
 
       const llmRes = await callLLM({ systemPrompt, userPrompt });
       result = JSON.parse(llmRes.content);
+      if (Array.isArray(result.matchedSkills)) {
+        result.matchedSkills = result.matchedSkills.map(s => (typeof s === 'string' ? s.toLowerCase() : s));
+      }
+      if (Array.isArray(result.missingSkills)) {
+        result.missingSkills = result.missingSkills.map(s => (typeof s === 'string' ? s.toLowerCase() : s));
+      }
       logData.provider = llmRes.provider;
       logData.model = llmRes.model;
       logData.promptTokens = llmRes.promptTokens;
@@ -208,6 +233,10 @@ const careerChat = async (userId, userMessage, conversationHistory = [], seekerP
   const startTime = Date.now();
   const config = getAIConfig();
 
+  if (!config.isConfigured) {
+    throw new Error('AI provider is not configured. Please set GROQ_API_KEY in your environment variables.');
+  }
+
   let logData = {
     user: userId,
     feature: 'career_chat',
@@ -216,100 +245,97 @@ const careerChat = async (userId, userMessage, conversationHistory = [], seekerP
   };
 
   const skillsList = (seekerProfile.skills || []).join(', ') || 'Software Development';
-  const systemPrompt = `You are Antigravity Career Coach, an intelligent AI career mentor for a job seeker.
-The seeker has skills in: ${skillsList}. Experience: ${seekerProfile.experienceYears || 0} years.
-Give encouraging, actionable, modern, and concrete career advice. Help with resume building, interview preparation, salary negotiation, and skill upskilling.
-Return a friendly response formatted cleanly in markdown.`;
+  const systemPrompt = `You are Antigravity Career Coach, an intelligent, empathetic, and expert AI career mentor.
+Candidate Background:
+- Technical Skills: ${skillsList}
+- Total Experience: ${seekerProfile.experienceYears || 0} years
+- Current Professional Headline: ${seekerProfile.headline || 'Software Professional'}
 
-  if (config.isConfigured) {
+Guidelines:
+- Provide clear, actionable, friendly, and structured advice tailored specifically to the user's question.
+- Format responses nicely in Markdown (using headers, bullet points, and code/quote blocks where appropriate).
+- Directly answer the user's prompt without repeating generic welcome greetings.`;
+
+  // Format valid conversation history for the LLM
+  const cleanHistory = (conversationHistory || [])
+    .filter(m => m && typeof m.text === 'string' && m.text.trim())
+    // Omit default greeting if present in history
+    .filter(m => !m.text.includes("I'm your AI Career Coach. I can help optimize your resume"))
+    .slice(-6)
+    .map(m => ({
+      role: m.sender === 'user' ? 'user' : 'assistant',
+      content: m.text.trim()
+    }));
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...cleanHistory,
+    { role: 'user', content: userMessage.trim() }
+  ];
+
+  // Model fallback chain: preferred first, then known active models
+  const candidateModels = [
+    config.model,
+    'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
+    'qwen/qwen3.8-27b'
+  ].filter((v, i, a) => v && a.indexOf(v) === i);
+
+  let lastError = null;
+  for (const modelToTry of candidateModels) {
     try {
       const endpoint = `${config.baseURL}/chat/completions`;
-      const messages = [
-        { role: 'system', content: systemPrompt },
-        ...conversationHistory.slice(-6).map(m => ({
-          role: m.sender === 'user' ? 'user' : 'assistant',
-          content: m.text
-        })),
-        { role: 'user', content: userMessage }
-      ];
-
       const response = await axios.post(
         endpoint,
         {
-          model: config.model,
+          model: modelToTry,
           messages,
           temperature: 0.7,
-          max_tokens: 800
+          max_tokens: 1000
         },
         {
           headers: {
             'Authorization': `Bearer ${config.apiKey}`,
             'Content-Type': 'application/json'
           },
-          timeout: 20000
+          timeout: 25000
         }
       );
 
-      const usage = response.data.usage || {};
-      logData.provider = config.provider;
-      logData.model = config.model;
-      logData.promptTokens = usage.prompt_tokens || 0;
-      logData.completionTokens = usage.completion_tokens || 0;
-      logData.durationMs = Date.now() - startTime;
-      await AILog.create(logData);
+      const replyContent = response.data.choices?.[0]?.message?.content;
+      if (replyContent && replyContent.trim()) {
+        const usage = response.data.usage || {};
+        logData.provider = config.provider;
+        logData.model = modelToTry;
+        logData.promptTokens = usage.prompt_tokens || 0;
+        logData.completionTokens = usage.completion_tokens || 0;
+        logData.durationMs = Date.now() - startTime;
 
-      return {
-        reply: response.data.choices[0].message.content,
-        provider: config.provider
-      };
+        try {
+          await AILog.create(logData);
+        } catch (e) {}
+
+        return {
+          reply: replyContent,
+          provider: config.provider,
+          model: modelToTry
+        };
+      }
     } catch (err) {
-      console.warn('AI Chat API failed, using intelligent built-in advisor:', err.message);
+      lastError = err;
+      const status = err.response?.status;
+      const errMsg = err.response?.data?.error?.message || err.message;
+      console.warn(`Groq model "${modelToTry}" failed (${status}): ${errMsg}`);
+
+      if (status === 401) {
+        throw new Error('Invalid Groq API Key. Please verify your GROQ_API_KEY environment variable.');
+      }
     }
   }
 
-  // Built-in intelligent advisor response
-  let reply = '';
-  const msg = userMessage.toLowerCase();
-
-  if (msg.includes('resume') || msg.includes('cv')) {
-    reply = `### 📄 Resume Optimization Tips
-1. **Quantify Your Impact**: Use the Google XYZ formula: *"Accomplished [X] as measured by [Y], by doing [Z]"*.
-2. **ATS Alignment**: Mirror the exact keywords from the job description (e.g., *React, Node.js, Microservices*).
-3. **Keep it Clean**: Stick to clean single-column PDF formatting with standard section titles (*Experience, Skills, Education*).
-4. **Skills First**: Group skills into Frontend, Backend, Cloud/DevOps, and Databases to pass automated ATS filters.`;
-  } else if (msg.includes('interview') || msg.includes('question')) {
-    reply = `### 🎯 Interview Preparation Strategy
-1. **STAR Method**: For behavioral questions, structure your answers with **Situation, Task, Action, and Result**.
-2. **System Design**: Practice explaining trade-offs: Caching vs Latency, SQL vs NoSQL, Horizontal vs Vertical scaling.
-3. **Live Coding**: Think out loud! Interviewers care more about your problem-solving process than immediate perfection.
-4. **Questions to Ask**: Always ask insightful questions like: *"What is the biggest engineering challenge the team faced this quarter?"*`;
-  } else if (msg.includes('salary') || msg.includes('negotiat') || msg.includes('offer')) {
-    reply = `### 💰 Salary & Offer Negotiation Advice
-1. **Research Market Rates**: Check verified salary benchmarks for your role and location.
-2. **Never give a number first**: When asked for expectations, reply: *"I am looking for a competitive package aligned with market standards and the scope of this role."*
-3. **Consider the Total Package**: Base salary, equity/stock options, health insurance, remote stipends, and bonus structures.
-4. **Be Professional & Confident**: Always express enthusiasm for the team before counter-offering.`;
-  } else {
-    reply = `Hello! I'm your AI Career Coach. Based on your profile (${skillsList}), you have strong potential in the tech market. 
-
-I can assist you with:
-- 📝 **Resume Audits & ATS Keyword Optimization**
-- 💡 **Technical & Behavioral Interview Prep**
-- 🚀 **Personalized Career Roadmap & Skill Upgrades**
-- 💵 **Job Search Strategies & Offer Negotiation**
-
-What specific topic would you like to explore today?`;
-  }
-
-  logData.durationMs = Date.now() - startTime;
-  try {
-    await AILog.create(logData);
-  } catch (e) {}
-
-  return {
-    reply,
-    provider: 'local-advisor'
-  };
+  // If all models in the chain failed, throw an informative error
+  const detailedError = lastError?.response?.data?.error?.message || lastError?.message || 'Unable to generate response';
+  throw new Error(`AI Career Coach service error: ${detailedError}`);
 };
 
 /**

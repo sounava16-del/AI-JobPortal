@@ -41,15 +41,26 @@ const SeekerCareerChat = () => {
         history: newMessages.slice(-6)
       });
 
-      if (res.data.success) {
+      if (res.data.success && res.data.reply) {
         setMessages((prev) => [...prev, { sender: 'bot', text: res.data.reply }]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender: 'bot',
+            text: res.data.message || 'I encountered an issue processing that query. Please try again!'
+          }
+        ]);
       }
     } catch (err) {
+      const errorMsg =
+        err.response?.data?.message ||
+        'I apologize, but I encountered an error communicating with the AI service. Please verify your connection or try again.';
       setMessages((prev) => [
         ...prev,
         {
           sender: 'bot',
-          text: 'I apologize, but I encountered an issue processing that query. Please try asking again!'
+          text: `⚠️ ${errorMsg}`
         }
       ]);
     } finally {
