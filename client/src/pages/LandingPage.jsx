@@ -78,31 +78,6 @@ const LandingPage = () => {
             </Link>
           )}
         </div>
-
-        {/* Quick Demo Credentials Card */}
-        <div className="mt-14 max-w-2xl mx-auto p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md shadow-sm text-left">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
-            <Zap className="w-4 h-4 text-amber-500" />
-            <span>Ready-to-Test Demo Accounts (Pre-configured)</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-              <span className="font-bold text-indigo-600 dark:text-indigo-400 block">Candidate (Seeker)</span>
-              <code className="text-[11px] block text-slate-700 dark:text-slate-300 mt-1">alex.rivera@dev.com</code>
-              <span className="text-[10px] text-slate-400">Pass: seekerpassword123</span>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-              <span className="font-bold text-purple-600 dark:text-purple-400 block">Employer (Recruiter)</span>
-              <code className="text-[11px] block text-slate-700 dark:text-slate-300 mt-1">sarah.jenkins@techcorp.io</code>
-              <span className="text-[10px] text-slate-400">Pass: recruiterpassword123</span>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-              <span className="font-bold text-pink-600 dark:text-pink-400 block">Platform Admin</span>
-              <code className="text-[11px] block text-slate-700 dark:text-slate-300 mt-1">admin@aijobportal.com</code>
-              <span className="text-[10px] text-slate-400">Pass: adminpassword123</span>
-            </div>
-          </div>
-        </div>
       </section>
 
       {/* Feature Showcase Grid */}
