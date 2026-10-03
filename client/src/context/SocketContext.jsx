@@ -44,7 +44,11 @@ export const SocketProvider = ({ children }) => {
       return;
     }
 
-    const socketTarget = import.meta.env.VITE_API_URL || window.location.origin;
+    let rawTarget = import.meta.env.VITE_API_URL || window.location.origin;
+    let socketTarget = rawTarget.trim().replace(/\/+$/, '');
+    if (socketTarget && !socketTarget.startsWith('http://') && !socketTarget.startsWith('https://')) {
+      socketTarget = `https://${socketTarget}`;
+    }
     const newSocket = io(socketTarget, {
       auth: { token },
       transports: ['websocket', 'polling'],

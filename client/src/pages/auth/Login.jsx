@@ -61,12 +61,6 @@ const Login = () => {
     else navigate('/seeker/dashboard');
   };
 
-  const fillDemo = (demoEmail, demoPass) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setError('');
-  };
-
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-xl">
@@ -170,38 +164,6 @@ const Login = () => {
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
-        )}
-
-        {/* Demo Fill Shortcuts */}
-        {!requires2FA && (
-          <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2 text-center">
-              Quick 1-Click Demo Fill
-            </span>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => fillDemo('alex.rivera@dev.com', 'seekerpassword123')}
-                className="py-1.5 px-2 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-300 transition-colors"
-              >
-                Seeker
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo('sarah.jenkins@techcorp.io', 'recruiterpassword123')}
-                className="py-1.5 px-2 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-300 transition-colors"
-              >
-                Recruiter
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo('admin@aijobportal.com', 'adminpassword123')}
-                className="py-1.5 px-2 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-[11px] font-medium text-slate-700 dark:text-slate-300 transition-colors"
-              >
-                Admin
-              </button>
-            </div>
-          </div>
         )}
 
         <div className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
